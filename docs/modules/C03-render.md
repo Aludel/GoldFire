@@ -46,7 +46,7 @@ C01、C02、C04；`shared/config/palettes.json`、`time.json`
 
 ## 7. 测试要点
 
-- 中低配电脑上的帧率（定一个目标机型）
+- 目标机型上的帧率：Apple M1 或 Intel Iris Xe 级别集成显卡的笔记本，16 GB 内存，1080p 中画质 ≥ 60 帧
 
 ## 8. 开发提示词
 
@@ -59,6 +59,7 @@ C01、C02、C04；`shared/config/palettes.json`、`time.json`
 【允许的依赖】Godot 内置类（着色器、MultiMeshInstance3D、WorldEnvironment、Camera3D、Tween）；C01、C02、C04；GUT
 【规则补充】
   - 浮动原点：位置换算统一走一个函数（经纬度 + 高度 → 相对当前原点的 f32 坐标），C04、C05、C06 都用它；原点移动时发出信号，所有节点一起平移
+  - 目标机型：Apple M1 或 Intel Iris Xe 级别集成显卡的笔记本，16 GB 内存；性能验收都在这一档机器上跑 1080p 中画质
   - 所有模型用同一个风格化着色器；颜色只来自当前调色板（16 个色号），换调色板只改一个全局着色器参数
   - 镜头层级固定为：星系 → 轨道 → 大陆 → 区域 → 近景；fly_to 用 Tween 平滑过渡，过渡中不能跳过中间层级
   - 太阳方向角 = 一天里的秒数 / day_seconds × 360°（day_seconds 来自 time.json）；星球时间从服务器拿，不用本机时间
@@ -77,5 +78,5 @@ C03-4 星系视图、夜景灯光、聚合标记（阶段 2）
   - 测试：test_dust_binary_parsed、test_dust_points_single_multimesh、test_cluster_markers_at_continent_level
   【人工验收】十万个星尘点在目标机型上 ≥ 60 帧（在 PR 里写明机型）
 【验收（每个子任务）】tools/check_client.sh render；tools/check_tests.sh render <本子任务点名的测试>
-【停止条件】需要第二套着色器或调色板以外的颜色；没有定下目标机型（C03-4 前先问我）
+【停止条件】需要第二套着色器或调色板以外的颜色
 ~~~

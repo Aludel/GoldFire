@@ -89,6 +89,7 @@ pub trait Metering: Send + Sync {
   - 有效 token = (输出 × output_bp + 输入 × input_bp + 缓存读取 × cache_read_bp) / 10000（向下取整）
   - 点数 = 有效 token × 来源 bp × 模型 bp / 100000000（u128 计算，向下取整）；来源是 game 时模型 bp 固定为 10000，不查 model_bp
   - 记录里只有数字和标记，没有任何对话内容字段
+  - 上传本地用量日志的 HTTP 接口用 K00 的 CurrentUser 拿当前用户
 【子任务】
 K08-1 游戏内计量（阶段 1）
   - 放在第 1 阶段、排在 K10 之前，因为 K10-3 要上报用量；这时还没有模块订阅 MeterRecorded（K07 在第 2 阶段接入），这是正常的

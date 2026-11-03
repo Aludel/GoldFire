@@ -1,6 +1,6 @@
 # GoldFire 模块开发文档
 
-这个目录里，每个模块都有一份独立的开发文档。整体设计、玩法规则和架构原则见主文档 `GoldFire设计文档.md`。
+这个目录里，每个模块都有一份独立的开发文档。整体设计、玩法规则和架构原则见主文档 `docs/GoldFire设计文档.md`。
 
 ## 怎么用这些文档
 
@@ -63,7 +63,7 @@ L0           K00 核心基础
 | 编号 | 文档 | 首次阶段 |
 |---|---|---|
 | K00 | [核心基础](K00-core.md) | 1 |
-| K01 | [账号](K01-account.md) | 2 |
+| K01 | [账号](K01-account.md) | 1 |
 | K02 | [世界](K02-world.md) | 1 |
 | K03 | [时间与调度](K03-scheduler.md) | 1 |
 | K04 | [能力接口](K04-capability.md) | 1 |
@@ -119,7 +119,7 @@ L0           K00 核心基础
 
 ### 使用步骤
 
-1. 第一次使用前，把设计文档放进仓库：`docs/GoldFire设计文档.md` 和 `docs/modules/`
+1. 设计文档已经在仓库里：`docs/GoldFire设计文档.md` 和 `docs/modules/`
 2. 选一个子任务（例如 K07-2），从 main 新建一个分支，例如 `k07-2-daily-settlement`
 3. 开一个**新的** AI 会话，依次发送：
    - 下面的「通用开头」
@@ -168,7 +168,7 @@ L0           K00 核心基础
 | 错误 | K00 的 `ErrorKind`；HTTP 状态码按 K00 的映射表 |
 | 异步 | 会访问数据库、网络或 AI 的 trait 方法是 `async`（dyn trait 用 `async-trait`）；纯计算保持同步 |
 | 事务 | 能力流水线的计费、执行、记录三步在同一个数据库事务里。K02 的 `WorldWrite`、K07 的 `spend` / `grant` / `loot`、K17 的 `record` 第一个参数是 `tx: &mut Tx`（K00 提供）；事务里发的事件先写进 outbox，提交后才送出 |
-| HTTP | 每个 crate 导出 `pub fn router(state) -> axum::Router`，由 gf-app 合并；JSON 字段名用 snake_case |
+| HTTP | 每个 crate 导出 `pub fn router(state) -> axum::Router`，由 gf-app 合并；JSON 字段名用 snake_case；当前用户用 K00 的 `CurrentUser` 提取器（K01 的认证中间件填进去），只给管理员的接口用 `AdminUser` |
 | 数据库 | PostgreSQL；迁移文件放 `server/migrations/`，文件名 `<时间戳>_<模块>_<内容>.sql`（例如 `20261102000000_k02_planets.sql`）；每个模块只读写自己的表；查询用 sqlx 的 `query` / `query_as`，不用 `query!` 宏（那样编译时就要连数据库） |
 | 数据库测试 | 用 `#[sqlx::test]`，每个测试一个全新的数据库；先运行 `tools/dev_db.sh` 拿到 `DATABASE_URL` |
 | 测试数据 | 服务器的放仓库根目录 `fixtures/<模块或主题>/`；客户端的放 `client/tests/fixtures/<目录>/`（读 client/ 之外的文件用 `ProjectSettings.globalize_path("res://")` 拼路径）；AI 的固定回答放 `fixtures/ai/<任务>/`，手写，或者录下真实模型的回答再人工检查 |

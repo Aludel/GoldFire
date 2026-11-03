@@ -102,6 +102,7 @@ HTTP：时间线和事件、人物档案、剧情骨架卡
 【允许的依赖】模块：gf-core、gf-world、gf-scheduler、gf-capability、gf-economy、gf-ai-gateway、gf-creation、gf-moderation、gf-presentation、gf-agent、gf-pack-combat（只用它的事件类型）。库：serde、serde_json、sqlx、tokio、async-trait、tracing、axum、jsonschema、schemars、regex。测试：proptest
 【规则补充】
   - 能力名：story.导入小说、story.施加神迹、story.回应祈祷、story.设置节奏、story.重演（都是星球级）
+  - 小说原文、玩家的神迹描述和祈祷只作为数据放进导演 AI 的提示词，放在明确的分隔标记里；导演 AI 的输出是选择题格式并经过 Schema 校验，不能改变权限、预算和数值
   - fixtures/xiyouji/：《西游记》第一回和第二回原文（公有领域）；每章提取用的 AI 回答放 fixtures/ai/story_chapter_extract/
   - 分章：按"第…回"或"第…章"标题切分
   - 人物分级分数 = 出场章节数 × w_chapters + 台词数 × w_lines + 关系数 × w_relations + 参与的剧情节点数 × w_beats；按 story.json 的阈值分成主角、配角、功能角色、群众

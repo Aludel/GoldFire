@@ -23,7 +23,7 @@
 
 ## 3. 依赖
 
-K00、K01（HTTP 里的当前用户）、K12（素材的占地轮廓）
+K00（HTTP 里的当前用户用 K00 的 `CurrentUser`）、K12（素材的占地轮廓）
 
 ## 4. 对外接口
 
@@ -146,7 +146,7 @@ pub fn register_component(def: ComponentDef) -> Result<()>;
 【模块】K02 世界（包 gf-world，路径 server/kernel/world，层级 L3）
 【先读】docs/modules/K02-world.md；K12-asset.md 第 4 节（占地轮廓）；K04-capability.md 第 8 节（写操作都走能力接口）；主文档第 4、5、6、9.3、19.1、19.2、21 节
 【范围】server/kernel/world/、server/migrations/（文件名带 k02）、shared/config/planet.json、fixtures/world/、server/app/（只限接入本模块）
-【允许的依赖】模块：gf-core、gf-account（CurrentUser）、gf-asset（占地轮廓）。库：serde、serde_json、sqlx、tokio、async-trait、tracing、axum、h3o（含 geo 功能）、geo、jsonschema、schemars。测试：proptest、tokio-tungstenite（K02-7）
+【允许的依赖】模块：gf-core、gf-asset（占地轮廓）。库：serde、serde_json、sqlx、tokio、async-trait、tracing、axum、h3o（含 geo 功能）、geo、jsonschema、schemars。测试：proptest、tokio-tungstenite（K02-7）
 【规则补充】
   - planet.json：index_resolution 10、region_resolution 12、region_area_max_m2 4000000、inscription_max_chars 50、change_log_keep 10000、monument_lat 0、monument_lon 0
   - 空间索引：实体按 Transform 的位置放进 index_resolution 的格子；query_radius 先取覆盖半径的格子圈，再按大圆距离精确过滤（距离 ≤ 半径算在内）；结果按 EntityId 排序

@@ -71,6 +71,8 @@ pub mod rng {
 
 // 对象存储：快照、素材文件、上传的小说
 #[async_trait]
+pub struct CurrentUser { pub user: UserId, pub is_admin: bool }   // axum 提取器：读 K01 的认证中间件放进请求的身份；没有身份返回 PermissionDenied
+pub struct AdminUser(pub UserId);                               // axum 提取器：is_admin 为假时返回 PermissionDenied
 pub trait ObjectStore: Send + Sync {
     async fn put(&self, key: &str, bytes: Bytes) -> Result<()>;
     async fn get(&self, key: &str) -> Result<Bytes>;          // 不存在返回 NotFound
@@ -90,7 +92,7 @@ pub trait ObjectStore: Send + Sync {
 
 ## 7. 配置
 
-- `server.toml`：端口、数据库地址、日志级别
+- `server.toml`：端口、日志级别、开发模式、配置目录、管理员账号（admins）；数据库地址只从环境变量 DATABASE_URL 读
 - 密钥（数据库密码、模型 API Key）**只从环境变量读取**，不写进任何文件
 
 ## 8. 关键规则
@@ -167,7 +169,7 @@ K00-3 配置加载（阶段 1）
   - load_config(dir) 读取目录里所有 .json 文件（不递归），文件名去掉 .json 就是配置名
   - ConfigSet::get::<T>(name)：先用 schemars 生成 T 的 Schema 并用 jsonschema 校验，再反序列化
   - ConfigSet::ensure_all_used(names)：目录里有没被任何模块读取的文件就报错（防止拼错文件名）
-  - load_server_toml(path)：server.toml 只含 port、log_level、dev_mode、config_dir；数据库地址只从环境变量 DATABASE_URL 读
+  - load_server_toml(path)：server.toml 只含 port、log_level、dev_mode、config_dir、admins（管理员的账号编号列表，默认空）；数据库地址只从环境变量 DATABASE_URL 读
   - ConfigError 带文件路径；语法错误带行号和列号；Schema 错误带 JSON Pointer（例如 /tiers/1/rate_bp）
   - 测试（测试用的配置类型和文件放 fixtures/core/config/）：valid_config_loads、invalid_json_reports_line、missing_field_rejected_with_path、wrong_type_rejected_with_path、out_of_range_rejected_with_path（用 schemars 的 range 约束）、unknown_config_file_rejected、database_url_only_from_env
   【验收】tools/check_server.sh gf-core
@@ -185,6 +187,8 @@ K00-5 事件总线与 outbox（阶段 1）
 K00-6 时钟、编号、错误、启动组装（阶段 1）
   - Clock / SystemClock / FakeClock（可设置、可前进）；Timestamp（UTC 毫秒 i64）；Timestamp::utc_day() 返回从 1970-01-01 起的天数（UtcDay），UtcDay::start() 返回当天 0 点
   - define_id! 宏：生成 ULID 新类型（serde 用 26 位字符串，实现 Display、FromStr）；用它定义 UserId、PlanetId、EntityId、RegionId；PackId 是字符串新类型（小写字母、数字、下划线，1–32 个字符）
+  - CurrentUser、AdminUser 两个 axum 提取器（文档第 4 节）：从请求的扩展里读身份（由 K01 的认证中间件放进去）；没有身份、或者 AdminUser 遇到不是管理员时，返回 PermissionDenied
+  - 测试（提取器）：current_user_missing_is_permission_denied、admin_user_rejects_non_admin
   - Error { kind: ErrorKind, message }、Result<T>；HTTP 映射：InvalidInput 400、PermissionDenied 403、NotFound 404、Conflict 409、InsufficientResources 409、QuotaExceeded 429、Internal 500；响应体 {"error": {"kind": "invalid_input", "message": "..."}}
   - gf-app：读 server.toml → 加载配置 → 连接数据库并迁移 → 合并各包的 router → 启动 HTTP；GET /health 返回 200 和 {"status": "ok"}
   - 测试：fake_clock_advances、utc_day_boundaries（86_399_999 → 第 0 天，86_400_000 → 第 1 天）、id_string_roundtrip、pack_id_rejects_invalid_chars、error_kind_http_mapping（7 种全覆盖）、internal_error_message_hidden、health_endpoint_ok（用 tower 的 oneshot，不开端口）

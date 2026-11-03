@@ -67,6 +67,7 @@ HTTP / WebSocket：对话、预览、确认、设置（供 C10 使用）
 ## 6. 事件
 
 - 发布：`ProposalCreated`、`ProposalExecuted`、`ReflectionDone`
+- 订阅：K18 的 `PlanetBudgetExhausted`（思考预算用完时通知主人）
 
 ## 7. 配置
 

@@ -24,7 +24,7 @@
 
 ## 3. 依赖
 
-K00、K01（HTTP 接口用 `CurrentUser` 拿到当前用户）、K10（实现 K10 定义的 `CostGate`，使用它的 `Initiator`、`TaskKind`、`Tier`、`CostMicros`）
+K00（HTTP 接口用 `CurrentUser`、`AdminUser` 拿身份）、K10（实现 K10 定义的 `CostGate`，使用它的 `Initiator`、`TaskKind`、`Tier`、`CostMicros`）
 
 gf-app 在启动时把本模块作为 `CostGate` 注入 K10（依赖倒置，见主文档第 31 节）。K10 不知道灵感和支付的存在。
 
@@ -75,7 +75,7 @@ HTTP（灵感一律按向下取整显示）：
 | POST | `/admin/billing/grants` | 运营补偿：给某个玩家加购买余额，必须写原因 |
 
 - 支付关闭时，商品、下单、订单、回调四个接口不注册（访问返回 404）
-- `/admin/` 接口要求请求头 `X-GF-Admin-Token` 等于环境变量 `GF_ADMIN_TOKEN`；这个环境变量没设置时，`/admin/` 接口不注册
+- `/admin/` 接口只给管理员（K00 的 `AdminUser`：账号编号在 server.toml 的 `admins` 里），其他人返回 403
 
 ## 5. 数据
 
@@ -222,9 +222,9 @@ HTTP（灵感一律按向下取整显示）：
 
 ~~~text
 【模块】K18 额度与支付（包 gf-billing，路径 server/kernel/billing，层级 L3）
-【先读】docs/modules/K18-billing.md；K10-ai-gateway.md 第 4、8 节和【规则补充】；K01-account.md 第 4 节（CurrentUser）；K13-moderation.md 第 8 节；主文档第 8.4 节和第 36 节
+【先读】docs/modules/K18-billing.md；K10-ai-gateway.md 第 4、8 节和【规则补充】；K00-core.md 第 4 节（CurrentUser、AdminUser）；K13-moderation.md 第 8 节；主文档第 8.4 节和第 36 节
 【范围】server/kernel/billing/、server/migrations/（文件名带 k18）、shared/config/billing.json、fixtures/billing/、server/app/（只限接入本模块：把本模块作为 CostGate 注入 K10；注入 FakeProvider）
-【允许的依赖】模块：gf-core、gf-account（只用 CurrentUser）、gf-ai-gateway（只用 CostGate、Reservation、Initiator、SystemPool、TaskKind、Tier、CostMicros）。库：serde、serde_json、sqlx、tokio、async-trait、tracing、axum、schemars、hmac、sha2、subtle。测试：proptest
+【允许的依赖】模块：gf-core、gf-ai-gateway（只用 CostGate、Reservation、Initiator、SystemPool、TaskKind、Tier、CostMicros）。库：serde、serde_json、sqlx、tokio、async-trait、tracing、axum、schemars、hmac、sha2。测试：proptest
 【规则补充】
   - billing.json：
       micros_per_inspiration 1000；daily_free_inspiration 200；reservation_ttl_secs 600；max_inflight_per_user 3；max_calls_per_minute 30
@@ -238,11 +238,11 @@ HTTP（灵感一律按向下取整显示）：
   - estimate(task, units) = task_estimates[task]（没列出的用 default_estimate）× units；needs_confirm = 结果 > confirm_above_inspiration
   - 闸门按"官方承担的成本"（今天已结算的、从免费额度扣掉的 + 系统预算花掉的）计算；级别升高时发布 GateLevelChanged，同一天每个级别只发一次
   - FakeProvider（在本包里，测试和 e2e 都用）：create_checkout 返回 fake://checkout/<订单号>；回调体是 JSON {event_id, order_id, kind}，签名是回调体的 HMAC-SHA256（密钥来自环境变量 GF_FAKE_PAY_SECRET，测试里自己设置），十六进制放在请求头 X-GF-Signature
-  - /admin/ 接口：请求头 X-GF-Admin-Token 等于环境变量 GF_ADMIN_TOKEN（用 subtle 做常量时间比较）；环境变量没设置时不注册这些路由
+  - /admin/ 接口用 K00 的 AdminUser：不是管理员返回 403
   - 报表：收入 = 当天已支付 − 当天退款 − 当天已支付 × fee_bp / 10000；毛利 = 收入 − 全部成本
 【子任务】
 K18-1 额度账户、每日免费、扣款顺序（阶段 2）
-  - 测试：free_quota_resets_at_utc_midnight（用掉 150 灵感 → 剩 50；FakeClock 跨过 UTC 0 点 → 200）、purchased_equals_ledger_sum（proptest：随机的购买、扣款、退回序列）、display_rounds_down（1999 微元显示为 1 灵感）、admin_grant_requires_reason_and_token、estimate_and_confirm_threshold（ChapterExtract × 20 → 300 灵感，需要确认；CreationPick × 1 → 10 灵感，不需要；没列出的任务 × 1 → 20）
+  - 测试：free_quota_resets_at_utc_midnight（用掉 150 灵感 → 剩 50；FakeClock 跨过 UTC 0 点 → 200）、purchased_equals_ledger_sum（proptest：随机的购买、扣款、退回序列）、display_rounds_down（1999 微元显示为 1 灵感）、admin_grant_requires_reason_and_admin、estimate_and_confirm_threshold（ChapterExtract × 20 → 300 灵感，需要确认；CreationPick × 1 → 10 灵感，不需要；没列出的任务 × 1 → 20）
 K18-2 预留与结算、思考预算、防刷（阶段 2）
   - 测试：reserve_draws_free_then_bonus_then_purchased（免费剩 50000、月卡加赠 0、购买 1000000；预留 80000 → 免费 0、购买 970000；结算实际 60000 → 购买 990000、免费仍是 0）、reserve_rejected_without_change（免费 10000、购买 0，预留 160000 → QuotaExceeded，余额不变）、concurrent_reserve_never_overdraws（可用 200000，20 个并发预留各 20000 → 正好 10 个成功）、settle_above_reservation_charges_reserved_only（预留 160000、实际 200000 → 扣 160000，"超出预留"记 40000）、release_returns_everything、expired_reservation_released（过 601 秒后全部退回，状态为已过期）、planet_budget_limits_autonomous_only（思考预算 30 灵感：自主预留 20000 成功，再自主预留 20000 被拒；主人自己预留 20000 成功）、planet_budget_exhausted_published_once_per_day、inflight_and_rate_limits（第 4 个同时进行的预留被拒；一分钟内第 31 次被拒）
   【验收】另加 tools/mutants.sh gf-billing src/reserve.rs

@@ -44,6 +44,8 @@ pub enum Initiator {
     System(SystemPool),                                         // Safety：K13 的 AI 审核；Background：其他后台调用
 }
 
+pub enum SystemPool { Safety, Background }
+pub struct ReservationId(Ulid);           // 用 K00 的 define_id! 生成
 pub struct CostMicros(pub u64);         // 成本：结算货币的百万分之一
 
 #[async_trait]

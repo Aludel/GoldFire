@@ -89,6 +89,7 @@ HTTP：提交举报
   - 检查顺序：词库 → AI 审核（ContentClassifier）；任何一层拒绝就拒绝；AI 审核出错或超时就拒绝
   - 拒绝原因只给类别（例如"包含不当内容"），不回显命中的词
   - 测试用 FakeClassifier（固定返回值），不调用 AI
+  - 举报接口用 K00 的 CurrentUser 拿举报人；举报列表只给被举报内容所在星球的主人和管理员（K00 的 AdminUser，账号在 server.toml 的 admins 里）看
   - 没有注入分类器时：server.toml 的 dev_mode = true 只用词库，每次检查写一条 warn 日志；dev_mode = false 拒绝启动。K13-1 合并后、K10-1 接好适配器之前，本地开发就是这种情况。"没有分类器"和"分类器出错"是两回事：分类器出错时，开发模式下也拒绝
 【子任务】
 K13-1 词库 + AI 审核（阶段 1）
