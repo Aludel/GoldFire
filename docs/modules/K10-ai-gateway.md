@@ -123,8 +123,8 @@ pub trait AiGateway: Send + Sync {
 
 ~~~text
 【模块】K10 AI 网关（包 gf-ai-gateway，路径 server/kernel/ai_gateway，层级 L2）
-【先读】docs/modules/K10-ai-gateway.md；K08-metering.md 第 4 节；K13-moderation.md 第 4 节；K18-billing.md 第 8 节（K10-6）；X02-eval.md；主文档第 26、27 节
-【范围】server/kernel/ai_gateway/、server/migrations/（文件名带 k10）、shared/config/models.json、shared/prompts/、fixtures/ai/、server/app/（只限接入本模块：环境变量 GF_AI_FAKE_DIR 存在时注入 FakeGateway::from_dir，否则注入真实网关）
+【先读】docs/modules/K10-ai-gateway.md；K08-metering.md 第 4 节；K13-moderation.md 第 4、8 节；K18-billing.md 第 8 节（K10-6）；X02-eval.md；主文档第 26、27 节
+【范围】server/kernel/ai_gateway/、server/migrations/（文件名带 k10）、shared/config/models.json、shared/prompts/、fixtures/ai/、server/app/（只限接入本模块：环境变量 GF_AI_FAKE_DIR 存在时注入 FakeGateway::from_dir，否则注入真实网关；以及 K13 的 ContentClassifier 适配器，见 K10-1）
 【允许的依赖】模块：gf-core、gf-metering、gf-moderation。库：serde、serde_json、sqlx、tokio、async-trait、tracing、reqwest、jsonschema、schemars、sha2。测试：wiremock、proptest
 【规则补充】
   - 模型 API Key 只从环境变量读（变量名写在 models.json 里，例如 "api_key_env": "GF_KEY_DEEPSEEK"）
@@ -139,17 +139,21 @@ pub trait AiGateway: Send + Sync {
 K10-1 适配层、模板、FakeGateway（阶段 1）
   - OpenAI 兼容接口；结构化输出按 output_schema 解析并校验
   - 测试：openai_compatible_request_matches_fixture（请求体和 fixtures/ai/requests/creation_pick.json 一致）、structured_output_parsed_and_validated、template_variables_substituted、missing_template_variable_rejected、fake_gateway_scripted_and_from_dir、fake_gateway_miss_is_error
+  - 在 gf-app 里写 K13 的 ContentClassifier 适配器（K13-1 做的时候还没有网关，所以放在这里）：用网关调用审核模型，任务 moderation，发起人 System(Safety)，模板 shared/prompts/moderation/v1.md，输出 Schema 是审核结论；网关返回错误或兜底信号时，适配器返回错误（K13 按它的规则当作审核失败，拒绝）。接好以后，gf-app 总是注入这个适配器
+  - 测试（写在 gf-app 里）：moderation_adapter_maps_verdict（FakeGateway 返回"拒绝" → 分类结果是拒绝）、moderation_adapter_error_is_unavailable（FakeGateway 找不到回答 → 适配器返回错误）
+  【验收】另加 tools/check_server.sh gf-app；tools/check_tests.sh gf-app moderation_adapter_maps_verdict moderation_adapter_error_is_unavailable
 K10-2 分档路由、重试与兜底（阶段 1）
   - 测试：tier_routing_follows_models_json、invalid_output_retried_with_validation_error_in_prompt、fallback_model_used_after_retries、fallback_signal_after_all_models_fail、timeout_counts_as_failure、budget_exhausted_stops_calls
   【验收】另加 tools/mutants.sh gf-ai-gateway src/retry.rs
 K10-3 用量上报（阶段 1）
+  - K08-1 已经在第 1 阶段先做完：gf-app 把 K08 的计量实现注入网关
   - 测试：every_call_reports_usage_with_initiator_and_autonomous_flag、failed_and_retried_calls_also_reported、system_calls_not_reported、ai_calls_row_has_no_content
 K10-4 示例库（阶段 1）
   - 测试：top_examples_injected_by_quality、example_rejected_by_moderation_not_stored
 K10-5 评审、缓存、embedding（阶段 2）
   - 测试：review_score_parsed、identical_request_served_from_cache、cache_respects_expiry、embedding_dimension_matches_config
 K10-6 接入成本闸门（阶段 2）
-  - CostGate trait、Initiator 的新写法、CostMicros、Reservation 按文档第 4 节；测试用一个写在 tests/ 里的替身记录每次 reserve / settle / release，也可以设成拒绝
+  - CostGate trait、CostMicros、Reservation 按文档第 4 节（Initiator 在 K10-1 就已经按第 4 节实现）；测试用一个写在 tests/ 里的替身记录每次 reserve / settle / release，也可以设成拒绝
   - 测试：reserve_uses_budget_times_highest_chain_price（预算 10000 token；调用链：模型 A 输入 1000000、输出 2000000，模型 B 输入 4000000、输出 16000000（微元 / 百万 token）→ 预留 160000）、quota_exceeded_means_no_model_call（替身拒绝 → wiremock 收到 0 个请求，返回 QuotaExceeded）、settle_actual_cost_across_retries（模型 A 第一次输入 4000、输出 500，校验失败；重试输入 4600、输出 500 → 结算 10600）、max_tier_downgrades_routing（任务默认强档、max_tier 为中档 → 请求发给中档模型）、release_when_nothing_sent（模板变量缺失）、cache_hit_not_charged
   【验收】另加 tools/mutants.sh gf-ai-gateway src/cost.rs
 K10-7 图像与 3D 生成接口（阶段 4）

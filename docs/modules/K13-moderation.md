@@ -54,6 +54,7 @@ HTTP：提交举报
 - 版权检测：对照知名作品和角色列表，同时让 AI 判断"是否明显在模仿某个已知作品"
 - 拒绝时给出原因，但不暴露词库内容
 - 检查失败（审核服务不可用）时，默认拒绝，而不是放行
+- 没有接入 AI 审核时，只有开发模式可以只用词库；正式环境没有 AI 审核就拒绝启动
 
 ## 9. 开发步骤
 
@@ -80,7 +81,7 @@ HTTP：提交举报
 ~~~text
 【模块】K13 内容安全（包 gf-moderation，路径 server/kernel/moderation，层级 L1）
 【先读】docs/modules/K13-moderation.md；主文档第 15.8、34 节
-【范围】server/kernel/moderation/、server/migrations/（文件名带 k13）、shared/config/moderation.json、fixtures/moderation/、server/app/（只限接入本模块，以及 ContentClassifier 适配器）
+【范围】server/kernel/moderation/、server/migrations/（文件名带 k13）、shared/config/moderation.json、fixtures/moderation/、server/app/（只限接入本模块；ContentClassifier 适配器要调用 K10，由 K10-1 写）
 【允许的依赖】模块：gf-core。库：serde、serde_json、sqlx、tokio、async-trait、tracing、axum、schemars、unicode-normalization、pinyin。测试：proptest
 【规则补充】
   - 私有词库的路径从环境变量 GF_PRIVATE_WORDLIST 读；测试只用 fixtures/moderation/wordlist_test.txt（只放无害的占位词，例如"违禁样例"）
@@ -88,9 +89,10 @@ HTTP：提交举报
   - 检查顺序：词库 → AI 审核（ContentClassifier）；任何一层拒绝就拒绝；AI 审核出错或超时就拒绝
   - 拒绝原因只给类别（例如"包含不当内容"），不回显命中的词
   - 测试用 FakeClassifier（固定返回值），不调用 AI
+  - 没有注入分类器时：server.toml 的 dev_mode = true 只用词库，每次检查写一条 warn 日志；dev_mode = false 拒绝启动。K13-1 合并后、K10-1 接好适配器之前，本地开发就是这种情况。"没有分类器"和"分类器出错"是两回事：分类器出错时，开发模式下也拒绝
 【子任务】
 K13-1 词库 + AI 审核（阶段 1）
-  - 测试：wordlist_blocks、classifier_blocks、classifier_unavailable_rejects_by_default、rejection_reason_does_not_reveal_wordlist、blocked_text_hidden_in_long_text_found（2000 字正常文本中间夹一个词库词）、spaced_and_symbol_variants_found（"违 禁 样 例""违*禁*样*例"、全角字符）、homophone_variant_found（同音不同字）、split_character_variant_goes_to_classifier（拆字变体词库查不到，由 AI 审核拦下）、normal_text_passes
+  - 测试：wordlist_blocks、classifier_blocks、classifier_unavailable_rejects_by_default、rejection_reason_does_not_reveal_wordlist、blocked_text_hidden_in_long_text_found（2000 字正常文本中间夹一个词库词）、spaced_and_symbol_variants_found（"违 禁 样 例""违*禁*样*例"、全角字符）、homophone_variant_found（同音不同字）、split_character_variant_goes_to_classifier（拆字变体词库查不到，由 AI 审核拦下）、normal_text_passes、dev_mode_without_classifier_uses_wordlist_only（词库词照样拦下，正常文本通过）、classifier_required_outside_dev_mode
   【验收】另加 tools/mutants.sh gf-moderation src/check.rs
   【效果验收】tools/eval.sh moderation：拦截率 ≥ 95%，误伤率 ≤ 5%
 K13-2 举报（阶段 2）
