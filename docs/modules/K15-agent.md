@@ -74,6 +74,7 @@ pub struct Reaction {
 - **每次调用只给相关材料**：档案卡 + 最近记忆摘要 + 刚感知到的事件 + 当前可执行的行动列表
 - **一致性检查**：代码检查硬规则（死去的人物不能说话、人物不能知道自己没见过的事）；便宜档模型给台词打分，低分重做
 - 人物的行动和玩家一样走 K04，不能绕过规则
+- **人物花主人的金**：人物做花钱的改动（例如立石碑）时，金从星球主人的账户扣，和星球 AI 自主运转花的金一起算进主人设的每日金上限（K04 执行）；上限用完就拒绝，人物照常活动，只是做不了花钱的改动
 - 记忆定期压缩，控制 token 用量
 
 ## 9. 开发步骤
@@ -110,7 +111,7 @@ pub struct Reaction {
   - 显著程度 = 基础值 × max(0, 1 − 距离 / 感知半径)；基础值和感知半径按事件类型写在 agent.json；低于 perceive_threshold 的不进感知队列
   - 群众和功能角色不调用 AI；配角只在显著值超过 supporting_ai_threshold 时调用；主角在节拍和重大感知时调用
   - 一致性硬规则（代码检查）：死去的人物不能说话、不能行动；提示词里只放这个人物感知过的事件
-  - 人物的行动以 Caller::Agent 身份通过 K04 执行
+  - 人物的行动以 Caller::Agent 身份通过 K04 执行；花的金从星球主人的账户扣，算进主人设的每日金上限（由 K04 执行）
 【子任务】
 K15-1 档案卡与分级（阶段 5）
   - 测试：create_old_fisherman_from_fixture（fixtures/agent/old_fisherman.json：性格 3 个关键词、目标、恐惧、说话风格、3 句示范台词）、persona_card_requires_three_traits_and_lines、crowd_and_functional_tiers_never_call_ai

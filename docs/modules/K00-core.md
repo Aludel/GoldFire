@@ -149,7 +149,7 @@ K00-1 项目骨架（阶段 1）
   - rust-toolchain.toml 固定一个具体的稳定版本号（当前最新的稳定版）
   - 每个包只有空的 lib.rs；gf-app 的 main.rs 只返回成功（K00-6 再实现）。这是唯一允许空实现的子任务
   - client/：Godot 4 空项目（README 里写明固定的 Godot 版本号），GUT 装在 client/addons/gut，建好 client/tests/
-  - 根目录文件：.gitignore（含 .env、target/、client/.godot/）、LICENSE（AGPL-3.0 全文）、LICENSE-ASSETS（CC BY-SA 4.0 全文）、README.md（简介、编译、测试）、AGENTS.md（简介；文档位置；常用命令；"开发规则见 docs/modules/README.md 的通用开头和全局约定"）、CLAUDE.md（只有一行：请阅读 AGENTS.md）、CONTRIBUTING.md（分支、PR、AI 使用声明）、SECURITY.md（漏洞报告方式）、.github/pull_request_template.md（含"是否使用了 AI、用在哪里"一栏）
+  - 根目录文件：.gitignore（含 .env、target/、client/.godot/）、LICENSE（AGPL-3.0 全文）、LICENSE-ASSETS（CC BY-SA 4.0 全文）、README.md（简介、编译、测试）、AGENTS.md（已经存在，不要重写：保留现有内容，只更新「当前状态」一节，写明哪些工程和脚本已经建好）、CLAUDE.md（已经存在，不要改）、CONTRIBUTING.md（分支、PR、AI 使用声明）、SECURITY.md（漏洞报告方式）、.github/pull_request_template.md（含"是否使用了 AI、用在哪里"一栏）
   【验收】cargo build --workspace；godot --headless --path client --quit；git status --ignored 显示 target/ 和 client/.godot/ 被忽略
 K00-2 统一脚本与层级检查（阶段 1）
   - 写好 README"统一脚本"表里由 K00-2 创建的 7 个脚本：bash，set -euo pipefail，从任何目录运行都以仓库根目录为准；参数缺失时打印用法并返回 2

@@ -47,7 +47,7 @@ pub struct PlanetSettings {
     pub constitution: String,          // 星球设定
     pub autonomy: Autonomy,
     pub daily_ai_budget: u64,          // 思考预算：自主运转每天最多花多少灵感（K18 执行）
-    pub daily_gold_limit: u64,         // 自主模式下每天最多花多少金（默认按主人设置）
+    pub daily_gold_limit: u64,         // 星球 AI 自主运转和 AI 人物每天一共最多花主人多少金（K04 执行）
     pub daily_fire_limit: u64,         // 自主模式下每天最多花多少火（默认 0）
     pub allow_attack: bool,            // 是否允许发起攻击（默认 false）
     pub visitor_requests: VisitorPolicy,   // 访客的愿望：直接执行 / 需要主人批准 / 不接受（外观级、星球级都按它；建造者的星球级愿望也按它）
@@ -80,6 +80,7 @@ HTTP / WebSocket：对话、预览、确认、设置（供 C10 使用）
 - **思考预算由 K18 执行**：保存设置时调用 K18 的 `set_planet_budget`；自主运转的 AI 请求用 `Initiator::PlanetMindAutonomous { planet, owner }`。K18 拒绝（`QuotaExceeded`）时停止这次自主运转；收到 `PlanetBudgetExhausted` 时通知主人
 - 额度不够（`QuotaExceeded`）时，回复里说明原因（个人额度、思考预算、全服闸门、太频繁），并提示不用 AI 的做法：手动放置素材、用蓝图重建
 - **花费权限由主人选择**：金、火各有每日上限（可以是 0），是否允许发起攻击；默认只能花金、不能花火、不能发起攻击
+- **金的每日上限由 K04 执行**：保存设置时调用 K04 的 `set_autonomy_gold_limit`；AI 人物花的金也算在里面
 - 允许发起攻击时，AI 发起的攻击和主人亲自发起的共用每日攻击次数，每次都通知主人；攻击仍走 P02 的正常流程
 - 星球 AI 和玩家走同一扇门（K04），权限不超过主人
 - 每次执行都可以撤销（创作内容）
@@ -122,6 +123,7 @@ HTTP / WebSocket：对话、预览、确认、设置（供 C10 使用）
   - 星球设定和玩家的话只作为数据放进提示词（放在明确的分隔标记里），不能改变权限、预算和花费上限；这些只由代码检查
   - 谁发起谁付费：玩家请求的 AI 用量记在玩家名下；反思和自主行动记在主人名下并标记 autonomous = true
   - 思考预算的单位是灵感，由 K18 执行（见文档第 8 节）；K16 只保存设置、调用 set_planet_budget，不自己计数
+  - 金的每日上限由 K04 执行（AI 人物花的金也算在里面）；K16 保存设置时调用 K04 的 set_autonomy_gold_limit，不自己计数
   - 默认设置：autonomy CommandOnly、daily_ai_budget 按 planet_mind.json（例子：50 灵感）、daily_gold_limit 按 planet_mind.json、daily_fire_limit 0、allow_attack false、visitor_requests 需要主人批准
 【子任务】
 K16-1 只听指令、操作类意图（阶段 1）

@@ -55,11 +55,12 @@
 【规则补充】
   - 地形计算只调用 gf-terrain（通过 gf-client-ext 的 GfTerrain：height_at、biome_at、build_chunk）；GDScript 里不写任何地形公式
   - 分块生成放在 WorkerThreadPool，主线程只负责把生成好的网格挂上去
+  - 区块的顶点坐标相对区块中心（f32），区块节点的位置用 C03 的换算函数放到浮动原点下；不要以星球中心为原点直接算顶点坐标
   - 上材质规则来自 shared/config/terrain_materials.json：高度 ≥ 雪线 → 雪；坡度 ≥ rock_slope_deg → 岩石；其余 → 草地（坡度 ≤ tree_slope_deg 时可以长树）
   - 线性工程：沿服务器给的路径按模块长度等距摆放模块，模块的高度取 height_at
 【子任务】
 C04-1 接入共享地形库（阶段 1）
-  - 测试：test_golden_heights_match（读 shared/terrain/golden/seed_42.json 的 1000 个点，GfTerrain.height_at 的结果按 f32 位模式逐点相同）、test_chunk_built_off_main_thread、test_edits_change_chunk
+  - 测试：test_golden_heights_match（读 shared/terrain/golden/seed_42.json 的 1000 个点，GfTerrain.height_at 的结果按 f32 位模式逐点相同）、test_chunk_built_off_main_thread、test_edits_change_chunk、test_chunk_vertices_relative_to_chunk_center
   【验收】另加 cd client/ext && cargo test
 C04-2 自动上材质（阶段 1）
   - 测试：test_material_rules_table（表驱动：雪线上下、陡坡缓坡的组合各一行）

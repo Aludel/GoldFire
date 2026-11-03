@@ -44,6 +44,7 @@ pub enum Caller { Player(UserId), PlanetMind(PlanetId), Agent(EntityId), Pack(Pa
 pub fn register(def: CapabilityDef) -> Result<()>;
 pub async fn call(ctx: CallCtx, name: &str, input: Value, mode: Mode /* Preview | Execute */) -> Result<CallResult>;
 pub fn catalog(caller: &Caller, planet: PlanetId) -> Vec<CapabilityDoc>;
+pub async fn set_autonomy_gold_limit(planet: PlanetId, daily_gold: u64) -> Result<()>;   // K16 保存设置时调用：星球 AI 自主运转和 AI 人物每天一共最多花主人多少金
 ```
 
 - HTTP：`POST /capabilities/{name}`（预览或执行）；`GET /capabilities`（目录）
@@ -54,6 +55,8 @@ pub fn catalog(caller: &Caller, planet: PlanetId) -> Vec<CapabilityDoc>;
 | 表 | 关键字段 |
 |---|---|
 | capability_calls | id, client_request_id, caller, planet_id, name, input_hash, mode, result, cost, at |
+| autonomy_limits | planet_id, daily_gold |
+| autonomy_spend | planet_id, date, gold_spent（星球 AI 自主运转和 AI 人物当天一共花掉的金） |
 
 ## 6. 事件
 
@@ -75,6 +78,7 @@ pub fn catalog(caller: &Caller, planet: PlanetId) -> Vec<CapabilityDoc>;
 ```
 
 - 第 1 步之前：目标星球没加载时，先调用 K03 的 `ensure_current` 把它补算到现在（预览也一样）
+- **自主花费的金上限**：调用者是 AI 人物（Agent），或者是自主运转的星球 AI 时，金从星球主人的账户扣；第 6 步计费前检查：这颗星球今天的自主花费 + 这次的费用 ≤ 主人设的每日金上限（set_autonomy_gold_limit），超出就拒绝（QuotaExceeded）
 
 - 任何一步失败，整个调用回滚，不留下半截改动
 - 预览和执行使用同一个 `validate`，保证"预览看到的就是执行得到的"
@@ -169,7 +173,7 @@ K04-3 预览一致与撤销（阶段 1）
 K04-4 权限、计费与第 2 阶段能力（阶段 2）
   - 测试：permission_matrix（把上面的矩阵逐格写成表驱动测试）、insufficient_gold_rejected_without_changes、spend_recorded_with_planet_id、inscription_goes_through_moderation、set_member_requires_owner、unloaded_planet_caught_up_before_execute、undo_does_not_refund（放置花 8000 金后撤销：物体消失，金不退，撤销本身不扣金）
 K04-5 玩法包能力、MCP、限流（阶段 5）
-  - 测试：pack_capability_appears_in_catalog_after_install、pack_capability_limited_to_approved_level、spawn_entities_uses_system_rng、mcp_tools_match_catalog、mcp_call_respects_token_scope、rate_limit_returns_quota_exceeded
+  - 测试：pack_capability_appears_in_catalog_after_install、pack_capability_limited_to_approved_level、spawn_entities_uses_system_rng、mcp_tools_match_catalog、mcp_call_respects_token_scope、rate_limit_returns_quota_exceeded、agent_spends_owner_gold（人物立石碑：扣星球主人的金）、autonomy_gold_limit_shared（上限 1000：星球 AI 自主运转花掉 600 后，人物再花 500 被拒）
 【验收（每个子任务）】tools/check_server.sh gf-capability；tools/check_tests.sh gf-capability <本子任务点名的测试>
 【停止条件】某个能力需要绕过流水线；一次调用需要跨两颗星球；权限矩阵里出现上面没写的情况
 ~~~

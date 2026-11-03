@@ -75,6 +75,8 @@
 | `supply.json` / `environment.json` | 供给规则 / 环境平衡与灾厄阈值 | P01 |
 | `boss.json` | 灾厄与世界 BOSS 参数、奖励 | P03 |
 | `time.json` | 昼夜、季节 | K03、C03 |
+| `render.json` | 客户端渲染参数（例如浮动原点的移动距离） | C03 |
+| `terrain_materials.json` | 地形上材质的规则（雪线、岩石坡度、长树坡度） | C04 |
 | `effects.json` | 特效零件 | K11、C06 |
 | `palettes.json` | 调色板 | K11、C03 |
 | `models.json` | 模型分档、任务默认档位、备用模型、模型单价 | K10、K18 |

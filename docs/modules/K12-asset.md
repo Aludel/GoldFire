@@ -104,6 +104,7 @@ K12-2 标签检索（阶段 1）
   - 先按类别和标签过滤，再按标签命中数排序，命中数相同按编号排序
   - 测试：search_by_tag_and_category（"茶馆"→ 茶馆_01 排第一）、search_respects_limit、unknown_category_rejected
 K12-3 语义检索与主题包（阶段 2）
+  - 开始前 K10-5 要已经合并：Embedder 适配器要调用 K10 的 embed
   - 测试：semantic_search_ranks_by_similarity（FakeEmbedder 返回固定向量）、theme_pack_loads_assets_palette_rules
   【效果验收】tools/eval.sh retrieval 的前 20 名命中率 ≥ 90%
 K12-4 质检流程（阶段 4）

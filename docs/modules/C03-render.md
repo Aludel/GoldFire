@@ -30,6 +30,7 @@ C01、C02、C04；`shared/config/palettes.json`、`time.json`
 
 ## 5. 关键规则
 
+- **浮动原点**：服务器的坐标是经纬度（f64），星球半径约 6371 km，直接交给 Godot 的单精度浮点数会抖动。客户端以当前区域附近的一点为渲染原点，物体位置先用 f64 算出相对原点的偏移，再转成 f32；镜头离原点超过 render.json 的 origin_shift_m 时，把原点移到镜头附近，所有物体一起平移。轨道视图的原点就是星球中心（这时 0.5 米的误差看不出来）
 - 镜头层级：星系 → 轨道 → 大陆（聚合标记）→ 区域（45° 俯视）→ 近景（移轴）
 - 十万个星尘点要一次绘制完成（用点精灵或实例化渲染）
 - 不在客户端做任何规则判定
@@ -57,6 +58,7 @@ C01、C02、C04；`shared/config/palettes.json`、`time.json`
 【范围】client/render/、client/tests/render/、client/tests/fixtures/render/、shared/config/palettes.json（只加调色板）
 【允许的依赖】Godot 内置类（着色器、MultiMeshInstance3D、WorldEnvironment、Camera3D、Tween）；C01、C02、C04；GUT
 【规则补充】
+  - 浮动原点：位置换算统一走一个函数（经纬度 + 高度 → 相对当前原点的 f32 坐标），C04、C05、C06 都用它；原点移动时发出信号，所有节点一起平移
   - 所有模型用同一个风格化着色器；颜色只来自当前调色板（16 个色号），换调色板只改一个全局着色器参数
   - 镜头层级固定为：星系 → 轨道 → 大陆 → 区域 → 近景；fly_to 用 Tween 平滑过渡，过渡中不能跳过中间层级
   - 太阳方向角 = 一天里的秒数 / day_seconds × 360°（day_seconds 来自 time.json）；星球时间从服务器拿，不用本机时间
@@ -64,7 +66,7 @@ C01、C02、C04；`shared/config/palettes.json`、`time.json`
   - 不在客户端做任何规则判定
 【子任务】
 C03-1 球面、旋转、两种视图（阶段 1）
-  - 测试：test_fly_orbit_to_surface_and_back、test_zoom_levels_in_order
+  - 测试：test_fly_orbit_to_surface_and_back、test_zoom_levels_in_order、test_floating_origin_precision（在离星球中心 6371 km 的地表放两个相距 0.1 米的物体，渲染后两者的距离和 0.1 米相差不到 1 毫米）、test_origin_shift_keeps_screen_positions（镜头离原点超过 origin_shift_m 时原点移动，移动前后物体在屏幕上的位置不变）
   【人工验收】录屏：从轨道平滑降落到地表，再飞回轨道
 C03-2 统一着色器、调色板、后期（阶段 1）
   - 测试：test_all_models_use_unified_shader、test_palette_swap_updates_all_materials
