@@ -19,7 +19,7 @@
 
 ## 3. 依赖
 
-K00、K01（令牌）、K02（权限、写入）、K07（计费）、K13（内容安全）、K17（记录）
+K00、K01（令牌）、K02（权限、写入）、K03（写入没加载的星球前先补算）、K07（计费）、K13（内容安全）、K17（记录）
 
 ## 4. 对外接口
 
@@ -74,6 +74,8 @@ pub fn catalog(caller: &Caller, planet: PlanetId) -> Vec<CapabilityDoc>;
 → 9 发出 CapabilityExecuted → 10 返回结果
 ```
 
+- 第 1 步之前：目标星球没加载时，先调用 K03 的 `ensure_current` 把它补算到现在（预览也一样）
+
 - 任何一步失败，整个调用回滚，不留下半截改动
 - 预览和执行使用同一个 `validate`，保证"预览看到的就是执行得到的"
 - 调用者是玩法包或星球 AI 时，权限不能超过它被批准的范围
@@ -101,8 +103,8 @@ pub fn catalog(caller: &Caller, planet: PlanetId) -> Vec<CapabilityDoc>;
 
 | 级别 | 玩家 | 星球 AI | 玩法包 | 人物 | 外部令牌 |
 |---|---|---|---|---|---|
-| 外观级 | 建造者及以上 | 按发起人的角色 | 安装时批准了外观级 | 可以 | 令牌范围内，且令牌主人是建造者及以上 |
-| 星球级 | 主人 | 主人发起或自主运转时可以；访客发起时按访客策略 | 安装时批准了星球级 | 不可以 | 令牌范围内，且令牌主人是主人 |
+| 外观级 | 建造者及以上 | 主人、建造者发起时按发起人的角色；访客发起时按访客策略 | 安装时批准了外观级 | 可以 | 令牌范围内，且令牌主人是建造者及以上 |
+| 星球级 | 主人 | 主人发起或自主运转时可以；建造者和访客发起时按访客策略 | 安装时批准了星球级 | 不可以 | 令牌范围内，且令牌主人是主人 |
 | 官方级 | 可以（由能力自己的规则检查） | 只有主人允许的（攻击要 allow_attack） | 只有官方玩法包 | 不可以 | 不可以 |
 
 - 第 1 阶段不收费：`server/app` 注入一个估算为 0、扣费直接成功的经济实现，第 2 阶段换成 K07
@@ -135,7 +137,7 @@ pub fn catalog(caller: &Caller, planet: PlanetId) -> Vec<CapabilityDoc>;
 【模块】K04 能力接口（包 gf-capability，路径 server/kernel/capability，层级 L5）
 【先读】docs/modules/K04-capability.md；K01、K02、K07、K13、K17 文档的第 4 节；主文档第 16.5、16.7、19.3 节
 【范围】server/kernel/capability/、server/migrations/（文件名带 k04）、shared/config/capabilities.json、fixtures/capability/、server/app/（只限接入本模块）
-【允许的依赖】模块：gf-core、gf-account、gf-world、gf-economy、gf-moderation、gf-history。库：serde、serde_json、sqlx、tokio、async-trait、tracing、axum、jsonschema、schemars；MCP（K04-5）另加 rmcp。测试：proptest
+【允许的依赖】模块：gf-core、gf-account、gf-world、gf-economy、gf-moderation、gf-history、gf-scheduler（K04-4 起，只用 CatchUp）。库：serde、serde_json、sqlx、tokio、async-trait、tracing、axum、jsonschema、schemars；MCP（K04-5）另加 rmcp。测试：proptest
 【规则补充】
   - 内置能力的名字（输入的 Schema 写在代码里并生成到 shared/schemas/）：
       阶段 1：放置、移动（含旋转和缩放）、删除、改地形、播放特效、创建星球、划定区域、撤销
@@ -148,16 +150,16 @@ pub fn catalog(caller: &Caller, planet: PlanetId) -> Vec<CapabilityDoc>;
   - 放置的输入带 region_id；实体的占地轮廓必须完全在这个区域里（K02 的 footprint_inside）
   - 改地形 = 生成一个带 TerrainEdit 组件的实体；播放特效只广播给在场的人，不写入世界
   - 同一个 client_request_id 重复提交时，返回第一次的结果，不重复执行
-  - 撤销：输入 change_id；只有这次改动的发起人或星球主人可以撤销；从 K17 取反向操作，在同一次调用、同一个事务里执行
+  - 撤销：输入 change_id；只有这次改动的发起人或星球主人可以撤销；从 K17 取反向操作，在同一次调用、同一个事务里执行；撤销不退还原来花掉的资源，撤销本身也不收费
   - 权限矩阵（第 2 步）：
-      外观级：玩家要有建造者及以上角色；星球 AI 按发起人的角色；玩法包要在安装时批准了外观级；人物可以；外部令牌要在令牌范围内且令牌主人是建造者及以上
-      星球级：玩家要是主人；星球 AI 只在主人发起或自主运转时可以，访客发起时按访客策略；玩法包要在安装时批准了星球级；人物不可以；外部令牌要在令牌范围内且令牌主人是主人
+      外观级：玩家要有建造者及以上角色；星球 AI：主人、建造者发起时按发起人的角色，访客发起时按访客策略；玩法包要在安装时批准了外观级；人物可以；外部令牌要在令牌范围内且令牌主人是建造者及以上
+      星球级：玩家要是主人；星球 AI 在主人发起或自主运转时可以，建造者和访客发起时按访客策略；玩法包要在安装时批准了星球级；人物不可以；外部令牌要在令牌范围内且令牌主人是主人
       官方级：玩家可以（由能力自己的 validate 检查）；星球 AI 只能调用主人允许的（攻击要 allow_attack）；只有官方玩法包可以；人物和外部令牌不可以
   - 第 1 阶段不收费：gf-app 注入 FreeEconomy（估算费用为 0，扣费直接成功），第 2 阶段换成 K07
   - capabilities.json：每种调用者每分钟的调用上限；各内置能力的费用（放置按 buildings.json 的类别价格）
 【子任务】
 K04-1 能力登记与流水线（阶段 1）
-  - 第 8 节的 10 步按固定顺序执行；第 6–9 步在同一个事务里；预览只走第 1–6 步（第 6 步只估算）并返回"将要发生的改动"
+  - 第 8 节的 10 步按固定顺序执行；第 6–9 步在同一个事务里；第 1 步之前，目标星球没加载时先调用 K03 的 ensure_current（K04-4 起）；预览只走第 1–6 步（第 6 步只估算）并返回"将要发生的改动"
   - 测试：pipeline_steps_run_in_fixed_order、failure_at_any_step_leaves_no_changes（在第 1 到第 9 步分别制造失败，每次都确认：没有新实体、没有流水、没有历史记录、outbox 里没有新事件）、preview_writes_nothing、input_validated_against_schema、catalog_lists_only_permitted_capabilities、duplicate_client_request_id_not_executed_twice
   【验收】另加 tools/mutants.sh gf-capability src/pipeline.rs
 K04-2 第 1 阶段内置能力（阶段 1）
@@ -165,7 +167,7 @@ K04-2 第 1 阶段内置能力（阶段 1）
 K04-3 预览一致与撤销（阶段 1）
   - 测试：preview_equals_execution（proptest：随机的放置、移动、删除序列，预览列出的改动和执行后的改动完全相同）、undo_last_place、undo_last_move、undo_last_remove、undo_rejected_for_non_undoable、undo_by_other_builder_rejected
 K04-4 权限、计费与第 2 阶段能力（阶段 2）
-  - 测试：permission_matrix（把上面的矩阵逐格写成表驱动测试）、insufficient_gold_rejected_without_changes、spend_recorded_with_planet_id、inscription_goes_through_moderation、set_member_requires_owner
+  - 测试：permission_matrix（把上面的矩阵逐格写成表驱动测试）、insufficient_gold_rejected_without_changes、spend_recorded_with_planet_id、inscription_goes_through_moderation、set_member_requires_owner、unloaded_planet_caught_up_before_execute、undo_does_not_refund（放置花 8000 金后撤销：物体消失，金不退，撤销本身不扣金）
 K04-5 玩法包能力、MCP、限流（阶段 5）
   - 测试：pack_capability_appears_in_catalog_after_install、pack_capability_limited_to_approved_level、spawn_entities_uses_system_rng、mcp_tools_match_catalog、mcp_call_respects_token_scope、rate_limit_returns_quota_exceeded
 【验收（每个子任务）】tools/check_server.sh gf-capability；tools/check_tests.sh gf-capability <本子任务点名的测试>

@@ -89,10 +89,10 @@ pub fn register_component(def: ComponentDef) -> Result<()>;
 | Appearance | 造物配方（素材指纹、颜色色号、特效） |
 | Footprint | 占地轮廓 |
 | Creator | 创作者、创作时间 |
-| FunctionTags | 功能标签（能源、粮食、居住、防御、交通、信仰……） |
+| FunctionTags | 功能标签（能源、粮食、居住、防御、武器、交通、信仰……） |
 | Tags | 外观标签 |
 | RegionRef | 所在区域 |
-| TerrainEdit | 一次地形改动（类型、路径、参数）；地形改动就是带这个组件的实体，所以撤销和同步不需要特殊处理 |
+| TerrainEdit | 一次地形改动（类型、路径、参数，以及可选的侵蚀补丁）；地形改动就是带这个组件的实体，所以撤销和同步不需要特殊处理 |
 | Monument | 纪念塔标记（星球创建时生成，不能删除） |
 
 ## 6. 事件
@@ -155,7 +155,7 @@ pub fn register_component(def: ComponentDef) -> Result<()>;
   - 变化记录：每次写入在同一个事务里给这颗星球分配下一个序号（从 1 开始，连续不跳号），写进 planet_changes；只保留最近 change_log_keep 条
   - HTTP 只读：GET /planets/{id}、GET /planets/{id}/view（某个范围内可见的实体和组件）、GET /planets/{id}/changes?since=<序号>（返回 changes、last_seq、reload；since 比保留的最早一条还早时 reload = true、changes 为空）。创建星球、划区域、设置成员、刻字这些写操作都是 K04 的内置能力，由 K04 调用本模块的 WorldWrite
   - WorldWrite 新增：create_planet（kind 为 normal 或 trial；同时生成纪念塔实体）、claim_region、set_role、set_inscription；只接受内核身份的 WriteCtx
-  - 内核组件在文档的表之外再加两个：TerrainEdit（一次地形改动：类型、路径、参数）、Monument（纪念塔标记）
+  - 内核组件在文档的表之外再加两个：TerrainEdit（一次地形改动：类型、路径、参数、可选的侵蚀补丁 erosion_patch，格式见 X01-1）、Monument（纪念塔标记）
   - planets 表加 kind、last_seq；新增表 planet_changes（planet_id、seq、change JSONB、at）、blueprints（user_id、recipe、created_at）
 【子任务】
 K02-1 星球、实体、组件存取（阶段 1）

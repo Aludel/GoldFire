@@ -53,10 +53,10 @@ pub trait Metering: Send + Sync {
 ## 8. 关键规则
 
 - **有效 token = 输出 × 1 + 输入 × 0.2 + 缓存读取 × 0.01**
-- **点数 = 有效 token × 来源倍率 × 模型系数**
+- **点数 = 有效 token × 来源倍率 × 模型系数**；模型系数只用于网关和本地日志，游戏内用量不乘（模型是游戏按任务选的，玩家控制不了）
 - **只存用量，不存对话内容**；网关转发的内容不写入磁盘
 - 本地日志来源单独设每日上限
-- 不让玩家把 API Key 交给游戏
+- **如实说明网关会经手什么**：走网关时，玩家的 API Key 和请求内容会经过游戏服务器，只在内存里转发，不写磁盘、不写日志、不保存 API Key；代码开源可查。网关是可选的，接入页面要写清楚这些；不想用的玩家可以只上报本地日志
 
 ## 9. 开发步骤
 
@@ -87,16 +87,16 @@ pub trait Metering: Send + Sync {
 【规则补充】
   - metering.json：output_bp 10000、input_bp 2000、cache_read_bp 100；source_bp：game 10000、gateway 4000、local_log 1000；model_bp：每个模型的系数（没列出的模型用 default_model_bp 10000）；local_log_daily_cap 20000
   - 有效 token = (输出 × output_bp + 输入 × input_bp + 缓存读取 × cache_read_bp) / 10000（向下取整）
-  - 点数 = 有效 token × 来源 bp × 模型 bp / 100000000（u128 计算，向下取整）
+  - 点数 = 有效 token × 来源 bp × 模型 bp / 100000000（u128 计算，向下取整）；来源是 game 时模型 bp 固定为 10000，不查 model_bp
   - 记录里只有数字和标记，没有任何对话内容字段
 【子任务】
 K08-1 游戏内计量（阶段 1）
   - 放在第 1 阶段、排在 K10 之前，因为 K10-3 要上报用量；这时还没有模块订阅 MeterRecorded（K07 在第 2 阶段接入），这是正常的
-  - 测试：points_examples（游戏内：输出 10000、输入 20000 → 有效 14000、点数 14000；网关：输出 30000、输入 100000、缓存读取 5000000 → 有效 100000、点数 40000；网关：输出 1000000、输入 5000000、缓存读取 100000000 → 有效 3000000、点数 1200000；游戏内：输出 200000、输入 500000 → 点数 300000）、model_coefficient_applied（模型系数 3000 bp 时点数乘 0.3）、autonomous_flag_kept_in_event、record_has_no_content_fields（MeterRecord 和 meter_records 表都没有文本字段）
+  - 测试：points_examples（游戏内：输出 10000、输入 20000 → 有效 14000、点数 14000；网关：输出 30000、输入 100000、缓存读取 5000000 → 有效 100000、点数 40000；网关：输出 1000000、输入 5000000、缓存读取 100000000 → 有效 3000000、点数 1200000；游戏内：输出 200000、输入 500000 → 点数 300000）、model_coefficient_applied（网关来源、模型系数 3000 bp 时点数乘 0.3）、game_source_ignores_model_coefficient（游戏内来源、模型系数 3000 bp → 点数不变）、autonomous_flag_kept_in_event、record_has_no_content_fields（MeterRecord 和 meter_records 表都没有文本字段）
   【验收】另加 tools/mutants.sh gf-metering src/points.rs
 K08-2 GoldFire 网关（阶段 7）
   - OpenAI 兼容和 Anthropic 兼容的转发接口，从响应（含流式响应的最后一块）里读出用量；请求和响应正文只在内存里转发，不写磁盘、不写日志
-  - 测试（wiremock 模拟上游）：openai_usage_parsed、anthropic_usage_parsed、streaming_usage_parsed、bodies_never_persisted、upstream_error_passed_through
+  - 测试（wiremock 模拟上游）：openai_usage_parsed、anthropic_usage_parsed、streaming_usage_parsed、bodies_never_persisted、api_key_never_persisted_or_logged、upstream_error_passed_through
 K08-3 本地日志上传（阶段 7）
   - 先向我要真实的 Claude Code 用量日志样本（去掉内容后放进 fixtures/metering/local_logs/），没有样本不开始
   - 测试：local_log_points_use_local_multiplier、local_log_daily_cap_applied、duplicate_upload_ignored

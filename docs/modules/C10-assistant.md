@@ -5,7 +5,7 @@
 ## 1. 职责
 
 - 和星球 AI 对话：输入自然语言，显示星球 AI 的回复和提问
-- **预览改动**：在星球上高亮将要新增、修改、删除的东西，并列出清单（"将放置 12 个物体、安装 1 个玩法"）和预计花费
+- **预览改动**：在星球上高亮将要新增、修改、删除的东西，并列出清单（"将放置 12 个物体、安装 1 个玩法"）和预计花费；有花费时提示"撤销不退还花掉的资源"
 - 确认 / 取消
 - **撤销**与**时光机**：查看改动时间线，撤销某次改动，恢复到某一天（只回退创作内容）
 - 试玩副本的进入和退出
@@ -57,13 +57,13 @@ C01、C03
 【允许的依赖】Godot 内置类；C01、C03；GUT
 【规则补充】
   - 发送时带上当前选中的区域和镜头看着的位置（K16 的 RequestContext）
-  - 没有预览就不能确认；预览时在星球上高亮将要新增（绿）、修改（黄）、删除（红）的东西，并列出数量和预计花费
+  - 没有预览就不能确认；预览时在星球上高亮将要新增（绿）、修改（黄）、删除（红）的东西，并列出数量和预计花费；有花费时同时显示"撤销不退还花掉的资源"
   - 时间线上不可撤销的改动（战斗结果、资源）标成灰色、没有撤销按钮
   - 星球设置只对主人显示
   - 额度以灵感显示，数字直接用服务器给的（K18 的 /billing/quota），客户端不自己换算；估算（/billing/estimate）的 needs_confirm 为真时，先弹确认再发送
 【子任务】
 C10-1 对话、预览、确认、撤销（阶段 1）
-  - 测试：test_preview_highlights_listed_changes、test_no_confirm_without_preview、test_confirm_then_undo_calls、test_request_includes_region_and_focus
+  - 测试：test_preview_highlights_listed_changes、test_no_confirm_without_preview、test_confirm_then_undo_calls、test_request_includes_region_and_focus、test_preview_warns_undo_not_refunded（预览有花费时显示提示，没有花费时不显示）
   【验收】另加 tools/e2e.sh sakura_forest（"在湖边种一片樱花林"→ 预览 → 确认 → 看到樱花树 → 撤销 → 樱花树消失）
 C10-2 星球设置与额度（阶段 2）
   - 测试：test_settings_send_spending_permissions（金、火每日上限和是否允许攻击）、test_settings_visible_only_to_owner、test_quota_shown_from_server、test_confirm_when_estimate_needs_confirm、test_quota_exceeded_reason_shown（四种原因各显示对应的提示）

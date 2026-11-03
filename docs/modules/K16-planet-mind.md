@@ -50,7 +50,7 @@ pub struct PlanetSettings {
     pub daily_gold_limit: u64,         // 自主模式下每天最多花多少金（默认按主人设置）
     pub daily_fire_limit: u64,         // 自主模式下每天最多花多少火（默认 0）
     pub allow_attack: bool,            // 是否允许发起攻击（默认 false）
-    pub visitor_requests: VisitorPolicy,   // 访客的愿望：直接执行 / 需要主人批准 / 不接受
+    pub visitor_requests: VisitorPolicy,   // 访客的愿望：直接执行 / 需要主人批准 / 不接受（外观级、星球级都按它；建造者的星球级愿望也按它）
 }
 ```
 
@@ -75,6 +75,7 @@ HTTP / WebSocket：对话、预览、确认、设置（供 C10 使用）
 ## 8. 关键规则
 
 - **谁发起，谁付费**：玩家的请求花玩家自己的额度；每日反思等自主运转花主人的额度（上报时标记 `autonomous = true`）
+- **访客策略同时管外观级和星球级**：访客发起的愿望、建造者发起的星球级愿望，都按访客策略处理（默认需要主人批准）；执行时花的金和灵感都是发起人自己的
 - **自主运转的用量不换算成资源点、不计入排名**
 - **思考预算由 K18 执行**：保存设置时调用 K18 的 `set_planet_budget`；自主运转的 AI 请求用 `Initiator::PlanetMindAutonomous { planet, owner }`。K18 拒绝（`QuotaExceeded`）时停止这次自主运转；收到 `PlanetBudgetExhausted` 时通知主人
 - 额度不够（`QuotaExceeded`）时，回复里说明原因（个人额度、思考预算、全服闸门、太频繁），并提示不用 AI 的做法：手动放置素材、用蓝图重建
@@ -128,7 +129,7 @@ K16-1 只听指令、操作类意图（阶段 1）
   - 另外准备 e2e 场景需要的 fixtures/ai/ 回答（包括内容审核那一次调用的回答：K10-1 接好适配器后，审核也走网关），让 tools/e2e.sh sakura_forest 能跑通（客户端部分在 C10-1）
   【效果验收】tools/eval.sh intent ≥ 95%（阶段 5 的测试集建好后）
 K16-2 星球设定、访客策略、预算（阶段 2）
-  - 测试：visitor_request_needs_owner_approval_by_default、requester_pays_usage_not_autonomous、budget_saved_to_billing（保存思考预算 50 → K18 的 set_planet_budget 收到 50）、budget_exhausted_stops_and_notifies_owner、quota_exceeded_reply_names_reason、constitution_cannot_raise_limits
+  - 测试：visitor_request_needs_owner_approval_by_default、requester_pays_usage_not_autonomous、budget_saved_to_billing（保存思考预算 50 → K18 的 set_planet_budget 收到 50）、budget_exhausted_stops_and_notifies_owner、quota_exceeded_reply_names_reason、constitution_cannot_raise_limits、visitor_policy_covers_appearance_level（访客说"种一棵樱花树"：策略为直接执行时直接种下、扣访客的金；策略为不接受时拒绝）
 K16-3 规则类和居民类意图（阶段 5）
   - 测试：meteor_shards_request_generates_pack_and_opens_trial（"每晚下流星雨，碎片可以捡"：先搜玩法市场，没有就生成玩法包 → 静态检查 → 试玩副本）、old_fisherman_request_creates_agent（"讲故事的老渔夫"）、market_pack_reused_before_generating
 K16-4 建议模式、自主模式、反思、休眠（阶段 5）

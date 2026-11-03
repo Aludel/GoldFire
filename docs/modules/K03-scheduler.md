@@ -5,7 +5,7 @@
 ## 1. 职责
 
 - **星球时间**：由服务器时间和星球创建时间算出星球上的日、季节、年
-- **星球实例**：有人进入时加载到内存，所有人离开一段时间后存回并卸载
+- **星球实例**：有人进入时加载，所有人离开一段时间后卸载。实例只是读缓存和调度器：所有写入（能力调用和心跳里的系统）都直接进数据库事务，卸载时不需要另外保存
 - **心跳**：按固定间隔运行已登记的系统（规则）
 - **补算**：实例加载时，按"上次更新到现在"的时间差，一次性算出离线期间的变化
 - **种子随机数**：给每个系统、每次心跳派生确定的随机种子
@@ -42,6 +42,10 @@ pub struct TickCtx<'a> {
 
 pub fn register_system(s: Arc<dyn System>);
 pub trait PlanetClock { fn planet_time(&self, p: PlanetId) -> PlanetTime; }
+#[async_trait]
+pub trait CatchUp: Send + Sync {             // 给 K04：写入一颗没加载的星球之前，先补算到现在
+    async fn ensure_current(&self, planet: PlanetId) -> Result<()>;
+}
 ```
 
 - HTTP：`GET /planets/{id}/time`（星球时间和服务器当前时间，供客户端校准昼夜）
@@ -68,7 +72,8 @@ pub trait PlanetClock { fn planet_time(&self, p: PlanetId) -> PlanetTime; }
 - 系统运行顺序固定（按登记顺序和声明的先后关系），保证结果可复现
 - 随机种子 = 哈希（星球种子, 心跳编号, 系统名）
 - 某个系统连续超出预算 → 暂停它并通知星球主人，不影响其他系统
-- 星球卸载前保存状态
+- **所有写入都进数据库**：一次心跳里所有系统的写入合成一个事务；每个系统在自己的保存点（savepoint）里运行，出错只撤回它自己的写入。实例里的数据只是缓存，卸载时直接丢掉，服务器崩溃不丢已经提交的数据
+- **写入没加载的星球之前先补算**：K04 执行能力之前，如果目标星球没加载，先调用 `ensure_current`：只运行 CatchUp 策略的系统，按离线时长补算并提交，不加载完整实例
 
 ## 9. 开发步骤
 
@@ -109,13 +114,14 @@ K03-1 星球时间（阶段 1）
   - HTTP：GET /planets/{id}/time 返回星球时间和服务器当前时间（客户端用它校准昼夜）
   - 测试：planet_time_examples（elapsed = 0 → 第 1 天、白天、第 1 季、第 1 年；3600 → 夜晚；7200 → 第 2 天、白天；604800 → 第 2 季；2419200 → 第 2 年、第 1 季）、planet_time_endpoint
 K03-2 实例加载、卸载与心跳（阶段 1）
-  - 收到 PlayerJoined 加载星球；最后一个人离开 unload_delay_s 秒后保存并卸载；心跳按登记顺序运行到期的系统；ScopedWriter 只能写系统所属玩法包的组件
-  - 测试：loads_on_join_unloads_after_delay、system_runs_at_its_interval、systems_run_in_registration_order、writer_limited_to_owner_components、day_and_night_events_while_loaded（FakeClock 前进时依次发出 NightStarted、DayStarted）
+  - 收到 PlayerJoined 加载星球；最后一个人离开 unload_delay_s 秒后卸载（不需要保存：写入在发生时已经提交）；心跳按登记顺序运行到期的系统，一次心跳一个数据库事务，每个系统一个保存点；ScopedWriter 只能写系统所属玩法包的组件
+  - 测试：loads_on_join_unloads_after_delay、system_runs_at_its_interval、systems_run_in_registration_order、writer_limited_to_owner_components、day_and_night_events_while_loaded（FakeClock 前进时依次发出 NightStarted、DayStarted）、system_error_rolls_back_only_its_writes（一次心跳里两个系统都写入，其中一个出错 → 只撤回它的写入，另一个照常提交）、unload_loses_nothing（卸载后用同一个数据库重新加载，数据和卸载前相同）
 K03-3 种子随机数（阶段 1）
   - 测试：same_inputs_same_sequence、different_system_names_differ、different_ticks_differ、system_rng_matches_core_derivation
 K03-4 补算（阶段 2）
+  - CatchUp::ensure_current(planet)：星球已加载就直接返回；没加载时，对 CatchUp 策略的系统按离线时长补算并提交，更新"上次更新时间"
   - 星球加载时，对 CatchUp 系统调用一次 catch_up(elapsed)，elapsed = 现在 − 上次心跳；Pause 系统不补算
-  - 测试：catch_up_equals_continuous_for_additive_system（测试系统每小时加 1000：连续运行 10 小时和离线 10 小时后补算，结果都是 10000）、pause_policy_skips_offline_time
+  - 测试：catch_up_equals_continuous_for_additive_system（测试系统每小时加 1000：连续运行 10 小时和离线 10 小时后补算，结果都是 10000）、pause_policy_skips_offline_time、ensure_current_catches_up_unloaded_planet（离线 10 小时后调用：可累加系统的结果是 10000；马上再调用一次，结果不变）
 K03-5 预算与暂停（阶段 5）
   - 系统一次运行超过 tick_budget_ms 记一次超额；连续 suspend_after 次 → 暂停这个系统、发出 SystemSuspended；其他系统照常
   - 测试：overrunning_system_suspended_others_continue、suspended_system_not_run

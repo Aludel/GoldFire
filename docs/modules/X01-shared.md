@@ -22,6 +22,7 @@
   - 不使用平台自带的三角函数和指数函数，改用纯 Rust 实现的数学库
   - 不使用多线程的不确定合并顺序
 - 有一套"金标准"测试：固定种子的输出存成文件，服务器和客户端都要逐点比对一致
+- **侵蚀补丁**：地形改动可以带一张侵蚀补丁（覆盖改动范围的经纬度网格，每个格点一个高度差）。侵蚀模拟只在服务器跑一次（K11），结果存进补丁；地形库只负责把补丁按双线性插值加到高度上，只用加减乘除，所以服务器和客户端仍然逐点一致
 
 ## 4. 数据格式（Schema）
 
@@ -65,11 +66,11 @@
 
 | 文件 | 内容 | 使用方 |
 |---|---|---|
-| `buildings.json` | 建筑各等级的价格、转换速度、防御与覆盖范围、供给需求、服务半径 | K04、P01、P02 |
+| `buildings.json` | 建筑各等级的价格、转换速度、防御与覆盖范围、供给需求、服务半径、武器倍率 | K04、P01、P02 |
 | `economy.json` | 递减档位、封顶、保底、能量池上限、默认转换速度、掠夺比例 | K07 |
 | `metering.json` | token 类型权重、来源倍率、模型系数 | K08 |
 | `billing.json` | 灵感与成本的换算、每日免费额度、任务估算、成本闸门、支付与商品 | K18 |
-| `combat.json` | 伤害参数、攻击半径、克制表、侦察、次数、保护时长、赛季 | P02 |
+| `combat.json` | 伤害参数、攻击半径、克制表、侦察、次数、保护时长、赛季、每次攻击花火的范围 | P02 |
 | `tags.json` | 功能标签和外观标签、联动规则 | K11、P01 |
 | `supply.json` / `environment.json` | 供给规则 / 环境平衡与灾厄阈值 | P01 |
 | `boss.json` | 灾厄与世界 BOSS 参数、奖励 | P03 |
@@ -109,6 +110,7 @@
 【允许的依赖】gf-terrain：只有 libm 和 serde（不依赖工作区里的任何包）。gf-schema-gen：schemars、serde_json、toml、clap，以及工作区里定义 Schema 类型的 gf- 包。测试：proptest
 【规则补充】
   - 地形库接口：height(seed: u64, edits: &[TerrainEdit], lat_deg: f64, lon_deg: f64) -> f32（米）；biome(同样的参数) -> Biome；build_chunk(seed, edits, 区域, 精度) -> Chunk（顶点高度和地貌）
+  - 侵蚀补丁：TerrainEdit 可以带 erosion_patch: Option<HeightPatch>；HeightPatch { lat_min, lat_max, lon_min, lon_max: f64, cols, rows: u16, deltas_dm: Vec<i16> }（高度差，单位分米，按行存）；height() 在补丁范围内加上四个相邻格点的双线性插值，只用加减乘除
   - 噪声在库里自己实现（用整数哈希），不用第三方噪声库；三角、指数、对数、幂函数只用 libm；在 shared/terrain/clippy.toml 里用 disallowed-methods 禁止 f32/f64 的 sin、cos、tan、asin、acos、atan、atan2、exp、ln、log10、log2、powf、powi、sinh、cosh、tanh、hypot、cbrt（同时保留根目录 clippy.toml 的设置）
   - 不用多线程合并结果；同样的输入在任何平台上逐位相同
   - 金标准 shared/terrain/golden/seed_42.json：种子 42、空改动列表，1000 个点（纬度从 −89.9° 到 89.9°、经度从 −180° 到 179.64° 均匀取样），每个点存经纬度和高度的 f32 位模式（u32）。这是确定性金标准：用代码生成一次，在 PR 里声明
@@ -116,7 +118,7 @@
   - 提示词目录 shared/prompts/<任务>/：v<N>.md 模板 + meta.toml（variables = [...]、eval_dataset = "..."）
 【子任务】
 X01-1 地形库与金标准（阶段 1）
-  - 测试：golden_heights_match、height_continuous（proptest：两点相距 1 米以内，高度差不超过 max_slope_per_m）、edit_affects_only_its_radius（改动半径外的高度和没有改动时逐位相同）、mountain_edit_raises_height
+  - 测试：golden_heights_match、height_continuous（proptest：两点相距 1 米以内，高度差不超过 max_slope_per_m）、edit_affects_only_its_radius（改动半径外的高度和没有改动时逐位相同）、mountain_edit_raises_height、height_patch_applied（补丁格点上的高度差正好是 deltas_dm / 10 米，补丁范围外不变；金标准里包含一个带补丁的改动）
   - .github/workflows/terrain.yml：在 Linux、macOS、Windows 上跑 golden_heights_match
   【验收】tools/check_server.sh gf-terrain；cargo clippy -p gf-terrain -- -D warnings（禁用的方法会报错）
 X01-2 Schema 自动生成与检查（阶段 1）

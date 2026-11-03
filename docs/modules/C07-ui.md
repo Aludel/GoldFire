@@ -8,7 +8,7 @@
 - 划区域：笔刷 / 套索画出任意形状的边界
 - 建造操作：选中、拖动、旋转、缩放（每个操作都是一次能力调用）
 - 纪念塔：查看和刻字；点击刻字高亮对应作者的作品
-- 战斗界面：匹配、侦察、选落点、攻击、战斗记录
+- 战斗界面：匹配、侦察、选武器、选落点、攻击、战斗记录
 - 世界 BOSS 界面：血量、出手、排行
 - 通知：被攻击、灾厄警告、祈祷
 - **商店**：额度包和月卡；用系统浏览器打开支付页面，轮询订单状态；显示剩余灵感（K18）
@@ -78,7 +78,7 @@ C07-1 建造操作与划区域（阶段 1）
 C07-2 星系视图、纪念塔、通知（阶段 2）
   - 测试：test_click_planet_opens_info、test_set_main_and_hidden_call_api、test_inscribe_calls_capability、test_click_inscription_highlights_author_works、test_notifications_listed
 C07-3 战斗界面（阶段 3）
-  - 测试：test_scout_then_attack_sequence、test_hidden_importance_not_displayed
+  - 测试：test_scout_then_attack_sequence、test_hidden_importance_not_displayed、test_weapon_picker_lists_own_functioning_weapons
 C07-4 商店（阶段 3）
   - 测试：test_shop_lists_products、test_buy_opens_checkout_in_browser（打开的是服务器返回的地址）、test_paid_only_after_server_status（服务器返回已支付之前，额度显示不变）、test_shop_hidden_when_payments_disabled
   【人工验收】录屏：用假渠道买一个额度包，看到灵感增加

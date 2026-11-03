@@ -5,7 +5,7 @@
 ## 1. 职责
 
 - **野生灾厄**：环境失衡时生成；72 小时计时；跃迁到邻近星球，或被世界 BOSS 吸收
-- **世界 BOSS**：每周一只 + 赛季末大 BOSS；全服共享血量；弱点标签；每人每天 3 次；三层奖励；失败惩罚
+- **世界 BOSS**：每周一只 + 赛季末大 BOSS；每周一 0 点（UTC）降临，在场 72 小时，提前击败就提前结束；全服共享血量；弱点标签；每人每天 3 次；三层奖励；失败惩罚
 - 调用 P02 的 `set_truce` 开关停战期
 
 ## 2. 不负责
@@ -39,7 +39,7 @@ HTTP：当前世界 BOSS 信息、贡献排行。WebSocket：世界 BOSS 频道�
 
 ## 7. 配置
 
-`boss.json`：灾厄存活时长、跃迁规则、世界 BOSS 血量公式（按上周活跃人数）、每日次数、奖励表、失败惩罚
+`boss.json`：灾厄存活时长、跃迁规则、世界 BOSS 血量公式（按上周活跃人数）、每日次数、奖励表、失败惩罚、世界 BOSS 在场时长
 
 ## 8. 关键规则
 
@@ -82,14 +82,15 @@ HTTP：当前世界 BOSS 信息、贡献排行。WebSocket：世界 BOSS 频道�
   - 到期没被击败：如果世界 BOSS 在场 → 被吸收（世界 BOSS 的 hp_total 和 hp_left 各加 absorb_hp，absorbed_count + 1）；否则跃迁到 K09 nearest 返回的第一个不在保护期的玩家的主星，重新计时
   - 世界 BOSS 血量 = hp_per_active_player × 上周活跃人数（K09 新增 active_users(日期范围)：这段时间有点数记录的玩家数）
   - 共享血量用数据库的原子更新（hp_left = GREATEST(hp_left − 伤害, 0) 并返回新值），不在内存里加减
-  - 伤害复用 P02 的 CombatControl::damage；带弱点标签的攻击 counter_bp 为 20000；每人每天 daily_attacks（3）次
+  - 伤害复用 P02 的 CombatControl::damage；武器的元素是 BOSS 的弱点元素时 counter_bp 为 20000；每人每天 daily_attacks（3）次
+  - 世界 BOSS（包括赛季末的大 BOSS）每周一 0 点（UTC）降临，在场 world_boss_hours（72）小时；提前击败就提前结束；到期时血量仍大于 0 算失败
   - 世界 BOSS 在场期间调用 P02 的 set_truce(true)，结束时 set_truce(false)
   - 失败（到期血量仍大于 0）：调用 K07 的 set_global_modifier（转换速度 −1000 bp，持续 7 天）
 【子任务】
 P03-1 野生灾厄（阶段 4）
   - 测试：calamity_spawned_on_threshold_with_appearance_generated_once、escapes_after_72h_to_nearest_unprotected、absorbed_when_world_boss_active、wild_boss_damage_settled_by_code
 P03-2 世界 BOSS（阶段 4）
-  - 测试：shared_hp_consistent_under_100_concurrent_attacks（100 个并发攻击后 hp_left = hp_total − 伤害之和，不小于 0）、weakness_tag_doubles_damage、daily_attack_limit_3、truce_set_via_combat_control、hp_scaled_by_last_week_active_players
+  - 测试：shared_hp_consistent_under_100_concurrent_attacks（100 个并发攻击后 hp_left = hp_total − 伤害之和，不小于 0）、weakness_tag_doubles_damage、daily_attack_limit_3、truce_set_via_combat_control、hp_scaled_by_last_week_active_players、boss_window_72h（周一 0 点降临、周四 0 点到期；提前击败时停战期同时结束）
 P03-3 奖励与惩罚（阶段 4）
   - 测试：participation_reward_after_one_attack、ranking_rewards_by_damage（按 boss.json 的奖励表）、rewards_granted_once、failure_sets_minus_10pct_modifier_for_one_week
 【验收（每个子任务）】tools/check_server.sh gf-pack-boss；tools/check_tests.sh gf-pack-boss <本子任务点名的测试>

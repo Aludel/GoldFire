@@ -64,7 +64,7 @@ pub fn validate_generation_output(output: &Value, map: &LocalMap, candidates: &[
 
 ## 7. 配置
 
-`creation.json`：候选数量、重试次数、规划阈值（多大的请求需要先规划）、布局规则库
+`creation.json`：候选数量、重试次数、规划阈值（多大的请求需要先规划）、布局规则库、侵蚀模拟参数（迭代次数、补丁网格的上限）
 
 ## 8. 关键规则
 
@@ -123,7 +123,8 @@ K11-1 组装层最小版（阶段 1）
   - 测试：teahouse_example_plan（"樱花环绕的茶馆"，固定回答是 茶馆_01 一个、樱花树_01 若干、环绕茶馆、颜色 3 → 方案里有 1 个茶馆_01 和 6 个环绕它的樱花树_01，全部在区域内，颜色都是 3）、out_of_region_item_retried_then_fixed（第一次回答有一项越界，重试请求里含"超出了区域边界"，第二次回答修正）、numeric_fields_rejected_and_retried、fallback_template_when_ai_fails、cell_refs_converted_to_positions、description_checked_by_moderation_first
   【效果验收】tools/eval.sh creation ≥ 90%
 K11-2 程序化地形入口（阶段 1）
-  - 测试：dragon_ridge_mountain_to_terrain_edit（"一座龙脊一样的山"，固定回答是 类型 山脉、锋利度 锋利、雪线 高 → 一个 TerrainEdit：类型山脉、sharpness_bp 8000、snowline_bp 6000）、river_to_terrain_edit、terrain_edit_raises_heights_along_path（用 gf-terrain 算改动前后路径上的高度）
+  - AI 给出地形参数后，服务器对改动范围跑一次风化侵蚀模拟（只在服务器跑；随机数用 gf_core::rng，同样的输入得到同样的补丁），结果存成这个 TerrainEdit 的 erosion_patch（格式见 X01-1）；客户端只读补丁，不跑模拟
+  - 测试：dragon_ridge_mountain_to_terrain_edit（"一座龙脊一样的山"，固定回答是 类型 山脉、锋利度 锋利、雪线 高 → 一个 TerrainEdit：类型山脉、sharpness_bp 8000、snowline_bp 6000）、river_to_terrain_edit、terrain_edit_raises_heights_along_path（用 gf-terrain 算改动前后路径上的高度）、erosion_patch_deterministic（同样的种子和参数跑两次，补丁逐格相同）、erosion_patch_within_grid_limit（补丁格数不超过 creation.json 的上限）
 K11-3 功能标签（阶段 1）
   - 测试：function_tags_only_from_enum、tags_saved_in_plan、name_does_not_change_tags（同一个造物改个名字，标签不变；用 fixtures/ai 里两份不同名字的固定回答）
   【效果验收】tools/eval.sh function_tags ≥ 90%
